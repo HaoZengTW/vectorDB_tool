@@ -1,0 +1,14 @@
+streamlit 
+pymupdf4llm 
+langchain==0.3.6
+langchain-community==0.3.4
+langchain-core==0.3.15
+ollama==0.3.3
+langchain-ollama==0.2.0
+langchain-text-splitters==0.3.1
+faiss-cpu==1.9.0 
+sentence_transformers
+langchain_huggingface
+groq==0.11.0
+langchain-groq==0.2.1
+firecrawl-py
