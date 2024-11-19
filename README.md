@@ -6,9 +6,9 @@ env設定:
 
 ---
 建立資料夾：
-database
-zip
-uploads
+* database
+* zip
+* uploads
 
 ---
 python套件安裝
