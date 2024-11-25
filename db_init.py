@@ -1,4 +1,10 @@
 import sqlite3
+import os
+
+os.makedirs('database')
+os.makedirs('zip')
+os.makedirs('uploads')
+
 
 # 連接數據庫（如果不存在則創建）
 conn = sqlite3.connect('database/files.db')

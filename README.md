@@ -5,12 +5,6 @@ env設定:
 * GROQ_API_KEY
 
 ---
-建立資料夾：
-* database
-* zip
-* uploads
-
----
 python套件安裝
 ```
 pip install -r requirements.txt

@@ -55,6 +55,7 @@ def pdf_handler():
             markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on,return_each_line=True,strip_headers=True)
 
             for split in st.session_state['file_content']:
+                split['metadata']['file']= uploaded_file.name
                 for key in ['format','title','producer','page_count','file_path','encryption','modDate','trapped','creationDate','creator','keywords','subject','author']:
                     split['metadata'].pop(key,None)
                 if len(split['tables']) >0 :
