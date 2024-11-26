@@ -3,7 +3,6 @@ import os
 from firecrawl import FirecrawlApp
 from tools.db_sqlite import get_latest_version, save_file
 
-load_dotenv()
 
 app = FirecrawlApp(api_key=os.environ["FIRECRAWL_API_KEY"])
 # 主函數
