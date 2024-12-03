@@ -1,6 +1,7 @@
 import streamlit as st
 import pymupdf4llm
-from tools.db_sqlite import get_latest_version, save_file,save_splits, get_latest_splits_version, get_selected_file_id
+from tools.db_mongo import get_max_version_for_name, insert_documents
+
 import os
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -19,7 +20,7 @@ def pdf_handler():
     uploaded_file = st.file_uploader('上傳您的 PDF 文件', type=['pdf'])
     if uploaded_file is not None:
         filename = uploaded_file.name
-        latest_version = get_latest_version(filename)
+        latest_version =  get_max_version_for_name('vectorDB_tool','chunks',filename)
         new_version = latest_version + 1
         file_folder = filename.split('.')[0]
         folder_path = f'uploads/{file_folder}'
@@ -35,27 +36,18 @@ def pdf_handler():
         if 'uploaded_filename' not in st.session_state or st.session_state['uploaded_filename'] != filename:
             st.session_state['uploaded_filename'] = filename
             st.session_state['file_content'] = pymupdf4llm.to_markdown(f'{folder_path}/{filename}',write_images=True,image_path=f'{folder_path}',page_chunks=True)
-            file_content = ''
-            for i in st.session_state['file_content']:
-                file_content += i['text']
-                
-            save_file(filename, new_version, file_content)
-            st.success(f'文件已保存為版本 {new_version}')
-            document_id = get_selected_file_id(filename)
-            latest_splits_version = get_latest_splits_version(document_id)
-            new_version = (latest_splits_version[0] + 1) if latest_splits_version and latest_splits_version[0]  is not None else 1
+
             final_chunks = []
             headers_to_split_on = [
                 ("#", "H1"),
                 ("##", "H2"),
                 ("###", "H3"),
-                ("####", "H4"),
-                ("#####", "H5"),
             ]
             markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on,return_each_line=True,strip_headers=True)
 
             for split in st.session_state['file_content']:
-                split['metadata']['file']= uploaded_file.name
+                split['metadata']['file'] = uploaded_file.name
+                split['metadata']['version'] = new_version
                 for key in ['format','title','producer','page_count','file_path','encryption','modDate','trapped','creationDate','creator','keywords','subject','author']:
                     split['metadata'].pop(key,None)
                 if len(split['tables']) >0 :
@@ -65,11 +57,8 @@ def pdf_handler():
                 md_splits = markdown_splitter.split_text(split['text'])
                 for md_split in md_splits:
                     md_split.metadata.update(split['metadata'])
-                    # print(md_split)
                     final_chunks.append(md_split)
-                # save_splits(md_split['metadata'],md_split['text'], new_version, document_id)
-            # print(final_chunks)
-            chunk_size = 500
+            chunk_size = 750
             chunk_overlap = 50
             text_splitter = RecursiveCharacterTextSplitter(
                 chunk_size=chunk_size, chunk_overlap=chunk_overlap
@@ -82,11 +71,25 @@ def pdf_handler():
                         Document(
                             page_content = "",
                             metadata = {
+                                'version': new_version,
+                                'file':filename,
                                 'type': 'image',
-                                'original_content': encode_image(f"{folder_path}/{file}")
+                                'original_content': encode_image(f"{folder_path}/{file}"),
+                                'imgname': file
                             }
                         )
                     )
-            for split in final_splits:
-                save_splits(split.metadata,split.page_content, new_version, document_id)
+            save_list = []
+            for doc in final_splits:
+                save_list.append(
+                    {
+                        'page_content':doc.page_content,
+                        'metadata': doc.metadata
+                    }
+                )
+            result = insert_documents('vectorDB_tool','chunks',save_list)
+            if result['code'] == 200:
+                st.success(f"檔案：『{filename}』 版本：{new_version}   {result['msg']}")
+            else:
+                st.error(f"檔案：『{filename}』 解析失敗： {result['msg']}")
 pdf_handler()

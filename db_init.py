@@ -1,9 +1,12 @@
 import sqlite3
 import os
 
-os.makedirs('database')
-os.makedirs('zip')
-os.makedirs('uploads')
+if not os.path.exists('database'):
+    os.makedirs('database')
+if not os.path.exists('zip'):
+    os.makedirs('zip')
+if not os.path.exists('uploads'):
+    os.makedirs('uploads')
 
 
 # 連接數據庫（如果不存在則創建）

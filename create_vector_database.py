@@ -1,5 +1,5 @@
 import streamlit as st
-from tools.db_sqlite import get_distinct_file, get_latest_content, save_splits, get_latest_splits_version, get_selected_file_id, get_splits,del_splits
+from tools.db_mongo import get_distinct_files, query_chunks_by_name_and_version, get_max_version_for_name, delete_documents_by_ids, batch_update_documents
 from langchain.schema.document import Document
 from langchain.vectorstores import FAISS
 from langchain_ollama import OllamaEmbeddings
@@ -10,9 +10,13 @@ import os
 import zipfile
 
 
-filenames = get_distinct_file()
-# embeddings = OllamaEmbeddings(model="hf.co/lagoon999/Chuxin-Embedding-Q8_0-GGUF",)
-embeddings = HuggingFaceEmbeddings(model_name="chuxin-llm/Chuxin-Embedding")
+get_fileName_result = get_distinct_files('vectorDB_tool','chunks','file')
+if get_fileName_result['code'] == 200:
+    file_list = get_fileName_result['data']
+else:
+    st.error(get_fileName_result['msg'])
+embeddings = OllamaEmbeddings(model="hf.co/lagoon999/Chuxin-Embedding-Q8_0-GGUF",)
+# embeddings = HuggingFaceEmbeddings(model_name="chuxin-llm/Chuxin-Embedding")
 
 def get_databases():
     res = []
@@ -25,21 +29,21 @@ databases = get_databases()
 st.title("向量資料庫")
 with st.expander('產生新資料庫'):
     db_name = st.text_input('資料庫名稱')
-    selected_filename = st.selectbox("文檔名稱:", filenames)
-    document_id = get_selected_file_id(selected_filename)
-    latest_splits_version = get_latest_splits_version(document_id)
-    if latest_splits_version and latest_splits_version[0]  is not None:
+    selected_filename = st.selectbox("文檔名稱:", file_list)
+    latest_splits_version = get_max_version_for_name('vectorDB_tool','chunks',selected_filename)
+    
+    if latest_splits_version and len(db_name)>0:
         if st.button("生成資料庫"):
             docs = []
-            splits_version = latest_splits_version[0]
-            splits = get_splits(document_id, splits_version)
+            splits_version = latest_splits_version
+            splits = query_chunks_by_name_and_version('vectorDB_tool','chunks', selected_filename, latest_splits_version)
             
-            for split in splits:
+            for split in splits['data']:
                 docs.append(
                     Document(
-                        page_content = split[0],
+                        page_content = split['page_content'],
                         
-                        metadata = json.loads(split[1].replace("'","\""))
+                        metadata = split['metadata']
                     )
                 )
             vectorstore = FAISS.from_documents(documents=docs, embedding=embeddings)
@@ -51,15 +55,13 @@ with st.expander('產生新資料庫'):
                 for file in files:
                     # 写入文件到.zip 文件中
                     zipf.write(os.path.join(root, file), 
-                            os.path.relpath(os.path.join(root, file), 
-                            os.path.join(folder_path, '..')))
+                    os.path.relpath(os.path.join(root, file), 
+                    os.path.join(folder_path, '..')))
                     
             # 关闭 ZipFile 对象
             zipf.close()
             databases = get_databases()
             st.success(f"{db_name} 已保存")
-    else:
-        st.write('尚未建立chunks')
 with st.expander('合併資料庫'):
     c_db_name = st.text_input('新資料庫名稱')
     selected_dbs = st.multiselect("向量資料庫:", databases)
@@ -93,7 +95,7 @@ with st.expander('合併資料庫'):
             # 关闭 ZipFile 对象
             zipf.close()
             databases = get_databases()
-            st.success(f"{db_name} 已保存")
+            st.success(f"{c_db_name} 已保存")
         else:
             st.write('請選擇要合併的資料庫')
         

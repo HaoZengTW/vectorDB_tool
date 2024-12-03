@@ -12,3 +12,4 @@ langchain_huggingface
 groq==0.11.0
 langchain-groq==0.2.1
 firecrawl-py
+pymongo
