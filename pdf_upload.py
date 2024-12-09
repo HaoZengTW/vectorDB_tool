@@ -43,7 +43,7 @@ def pdf_handler():
                 ("##", "H2"),
                 ("###", "H3"),
             ]
-            markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on,return_each_line=True,strip_headers=True)
+            markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on,return_each_line=False,strip_headers=True)
 
             for split in st.session_state['file_content']:
                 split['metadata']['file'] = uploaded_file.name

@@ -6,9 +6,27 @@ import pandas as pd
 from tools.llm_chains import summarize_image, summarize_table
 from tools.db_mongo import get_distinct_files, query_chunks_by_name_and_version, get_max_version_for_name, delete_documents_by_ids, batch_update_documents, insert_documents
 import time
+from bson import ObjectId
+
 
 st.session_state.chunks = []
 st.session_state.editMode = False
+if "importMode" not in st.session_state:
+    st.session_state.importMode = False
+def handle_imported_json(json_data,version):
+    imported_data = []
+    for item in json_data:
+        item["_id"] = str(ObjectId())  # Assign a new ObjectId if _id is missing
+        if not item.get("page_content"):
+            item["page_content"] = ""  # Default to empty string if page_content is missing
+        item["metadata"]['version'] = version
+        imported_data.append(item)
+    return imported_data
+
+def json_serializable(data):
+    if isinstance(data, ObjectId):
+        return str(data)
+    raise TypeError("Type not serializable")
 
 get_fileName_result = get_distinct_files('vectorDB_tool','chunks','file')
 if get_fileName_result['code'] == 200:
@@ -19,11 +37,27 @@ else:
 if file_list:
     selected_filename = st.selectbox("文檔名稱:", file_list)
     version = get_max_version_for_name('vectorDB_tool','chunks',selected_filename)
-    print(version,selected_filename)
     query_chunks = query_chunks_by_name_and_version('vectorDB_tool','chunks', selected_filename, version)
     if query_chunks['code'] == 200:
         st.session_state.chunks = query_chunks['data']
-    st.write(len(st.session_state.chunks))
+    st.write(f'Chunks數量：{len(st.session_state.chunks)}')
+    with st.expander('匯出/匯入'):
+        st.download_button(label="下載JSON", data=json.dumps(st.session_state.chunks, indent=4, default=json_serializable), file_name=f"{selected_filename}_v{version}.json")
+        uploaded_file = st.file_uploader("匯入JSON文件", type=["json"], on_change=lambda: st.session_state.update({"importMode": True}))
+        if st.session_state.importMode and uploaded_file:
+            try:
+                uploaded_data = json.load(uploaded_file)
+                processed_data = handle_imported_json(uploaded_data,version+1)
+                insert_documents('vectorDB_tool', 'chunks', processed_data)
+                st.success("匯入成功！")
+                st.session_state.importMode = False
+                st.rerun()
+            except json.JSONDecodeError:
+                st.error("JSON文件格式錯誤！")
+                st.session_state.importMode = False
+            except Exception as e:
+                st.error(f"匯入過程中發生錯誤：{str(e)}")
+                st.session_state.importMode = False
     df = pd.DataFrame(st.session_state.chunks)
     df['img'] = df['metadata'].apply(lambda x: f"data:image/png;base64,{x.get('original_content', '')}"  if isinstance(x, dict) else '')
     df['metadata'] =  df['metadata'].apply(lambda x: json.dumps(x, indent=4) if isinstance(x, dict) else str(x))
